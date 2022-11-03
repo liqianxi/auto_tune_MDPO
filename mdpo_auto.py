@@ -7,6 +7,7 @@ import warnings
 import numpy as np
 import tensorflow as tf
 from tfdeterminism import patch
+
 patch()
 
 from stable_baselines.a2c.utils import total_episode_reward_logger
@@ -65,7 +66,7 @@ class MDPO_Auto(OffPolicyRLModel):
 
     def __init__(self, policy, env, gamma=0.99, learning_rate=3e-4, buffer_size=50000,
                  learning_starts=100, train_freq=1, batch_size=256,
-                 tau=0.005, lamda=0, target_update_interval=1,
+                 tau=0.005, target_update_interval=1,
                  gradient_steps=1, action_noise=None, ent_coef='auto', target_entropy='auto',
                  random_exploration=0.0, verbose=0, tensorboard_log=None,
                  _init_setup_model=True, policy_kwargs=None, full_tensorboard_log=False, 
@@ -124,11 +125,10 @@ class MDPO_Auto(OffPolicyRLModel):
         self.processed_obs_ph = None
         self.processed_next_obs_ph = None
         self.seed = seed
-        self.lamda = lamda
         self.tsallis_q = tsallis_q
         self.reparameterize = reparameterize
         self.klconst = klconst
-
+        self.log_ent_coef = None
         #if self.tsallis_q == 1.0:
         #    self.log_type = "log"
         #else:
@@ -195,6 +195,34 @@ class MDPO_Auto(OffPolicyRLModel):
                                                                     policy_out, create_qf=True, create_vf=False,
                                                                     reuse=True)
 
+                    # Target entropy is used when learning the entropy coefficient
+                    if self.target_entropy == 'auto':
+                        # automatically set target entropy if needed
+                        self.target_entropy = -np.prod(self.env.action_space.shape).astype(np.float32)
+                    else:
+                        # Force conversion
+                        # this will also throw an error for unexpected string
+                        self.target_entropy = float(self.target_entropy)
+
+                    # The entropy coefficient or entropy can be learned automatically
+                    # see Automating Entropy Adjustment for Maximum Entropy RL section
+                    # of https://arxiv.org/abs/1812.05905
+                    if isinstance(self.ent_coef, str) and self.ent_coef.startswith('auto'):
+                        # Default initial value of ent_coef when learned
+                        init_value = 1.0
+                        if '_' in self.ent_coef:
+                            init_value = float(self.ent_coef.split('_')[1])
+                            assert init_value > 0., "The initial value of ent_coef must be greater than 0"
+
+                        self.log_ent_coef = tf.get_variable('log_ent_coef', dtype=tf.float32,
+                                                            initializer=np.log(init_value).astype(np.float32))
+                        self.ent_coef = tf.exp(self.log_ent_coef)
+                    else:
+                        # Force conversion to float
+                        # this will throw an error if a malformed string (different from 'auto')
+                        # is passed
+                        self.ent_coef = float(self.ent_coef)
+
                 with tf.variable_scope("target", reuse=False):
                     # Create the value network
                     _, _, value_target = self.target_policy.make_critics(self.processed_next_obs_ph,
@@ -229,12 +257,20 @@ class MDPO_Auto(OffPolicyRLModel):
                     qf1_loss = 0.5 * tf.reduce_mean((q_backup - qf1) ** 2)
                     qf2_loss = 0.5 * tf.reduce_mean((q_backup - qf2) ** 2)
 
+                     # Compute the entropy temperature loss
+                    # it is used when the entropy coefficient is learned
+                    ent_coef_loss, entropy_optimizer = None, None
+                    if not isinstance(self.ent_coef, float):
+                        ent_coef_loss = -tf.reduce_mean(
+                            self.log_ent_coef * tf.stop_gradient(logp_pi + self.target_entropy))
+                        entropy_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate_ph)
+
                     # Compute the policy loss
                     # Alternative: policy_kl_loss = tf.reduce_mean(logp_pi - min_qf_pi)
                     if self.reparameterize:
-                        policy_kl_loss = tf.reduce_mean(logp_pi * self.kl_coef_ph + self.tsallis_q * (self.lamda - self.kl_coef_ph) * logp_pi_old - qf1_pi)
+                        policy_kl_loss = tf.reduce_mean(logp_pi * self.kl_coef_ph + self.tsallis_q * (self.ent_coef - self.kl_coef_ph) * logp_pi_old - qf1_pi)
                     else:
-                        target_policy = tf.clip_by_value(tf.exp((-logp_old * self.lamda + qf1_pi - value_fn) / (self.kl_coef_ph + self.lamda)), 0, 0.9)
+                        target_policy = tf.clip_by_value(tf.exp((-logp_old * self.ent_coef + qf1_pi - value_fn) / (self.kl_coef_ph + self.ent_coef)), 0, 0.9)
                         policy_kl_loss = tf.reduce_mean(target_policy * (target_policy - logp_pi_old_action))
                         
                     mean_reg_loss = 1e-3 * tf.reduce_mean(self.policy_tf.act_mu ** 2)
@@ -254,7 +290,7 @@ class MDPO_Auto(OffPolicyRLModel):
                     # Target for value fn regression
                     # We update the vf towards the min of two Q-functions in order to
                     # reduce overestimation bias from function approximation error.
-                    v_backup = tf.stop_gradient(min_qf_pi - self.lamda * logp_pi)
+                    v_backup = tf.stop_gradient(min_qf_pi - self.ent_coef * logp_pi)
                     value_loss = 0.5 * tf.reduce_mean((value_fn - v_backup) ** 2)
 
                     values_losses = qf1_loss + qf2_loss + value_loss
@@ -303,12 +339,24 @@ class MDPO_Auto(OffPolicyRLModel):
                                          value_loss, qf1, qf2, value_fn, logp_pi,
                                          self.entropy, logp_pi_old, train_values_op, policy_train_op]
 
+                        # Add entropy coefficient optimization operation if needed
+                        if ent_coef_loss is not None:
+                            with tf.control_dependencies([train_values_op]):
+                                ent_coef_op = entropy_optimizer.minimize(ent_coef_loss, var_list=self.log_ent_coef)
+                                self.infos_names += ['ent_coef_loss', 'ent_coef']
+                                self.step_ops += [ent_coef_op, ent_coef_loss, self.ent_coef]
+
                     # Monitor losses and entropy in tensorboard
                     tf.summary.scalar('policy_loss', policy_loss)
                     tf.summary.scalar('qf1_loss', qf1_loss)
                     tf.summary.scalar('qf2_loss', qf2_loss)
                     tf.summary.scalar('value_loss', value_loss)
                     tf.summary.scalar('entropy', self.entropy)
+
+                    if ent_coef_loss is not None:
+                        tf.summary.scalar('ent_coef_loss', ent_coef_loss)
+                        tf.summary.scalar('ent_coef', self.ent_coef)
+                    
                     tf.summary.scalar('learning_rate', tf.reduce_mean(self.learning_rate_ph))
 
                 # Retrieve parameters that must be saved
@@ -346,10 +394,14 @@ class MDPO_Auto(OffPolicyRLModel):
         # qf1, qf2, value_fn, logp_pi, entropy, *_ = values
         entropy = values[4]
 
+        if self.log_ent_coef is not None:
+            ent_coef_loss, ent_coef = values[-2:]
+            return policy_loss, qf1_loss, qf2_loss, value_loss, entropy, ent_coef_loss, ent_coef
+
         return policy_loss, qf1_loss, qf2_loss, value_loss, entropy
 
     def learn(self, total_timesteps, callback=None, seed=None,
-              log_interval=2000, tb_log_name="MDPO_Auto", reset_num_timesteps=True, replay_wrapper=None):
+              log_interval=1000, tb_log_name="MDPO_Auto", reset_num_timesteps=True, replay_wrapper=None):
 
         new_tb_log = self._init_num_timesteps(reset_num_timesteps)
 
@@ -472,7 +524,10 @@ class MDPO_Auto(OffPolicyRLModel):
                         logger.logkv('eplenmean', safe_mean([ep_info['l'] for ep_info in ep_info_buf]))
                     logger.logkv("n_updates", n_updates)
                     logger.logkv("current_lr", current_lr)
-                    logger.logkv("lamda", self.lamda)
+
+                    print(self.infos_names)
+                    #print(self.ent_coef)
+                    #logger.logkv("ent_coef", self.ent_coef)
                     logger.logkv("fps", fps)
                     logger.logkv('time_elapsed', int(time.time() - start_time))
                     if len(episode_successes) > 0:
@@ -523,6 +578,8 @@ class MDPO_Auto(OffPolicyRLModel):
             "train_freq": self.train_freq,
             "batch_size": self.batch_size,
             "tau": self.tau,
+            "ent_coef": self.ent_coef if isinstance(self.ent_coef, float) else 'auto',
+            "target_entropy": self.target_entropy,
             "kl_coef": self.kl_coef_ph,
             # Should we also store the replay buffer?
             # this may lead to high memory usage

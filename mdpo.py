@@ -341,7 +341,7 @@ class MDPO(OffPolicyRLModel):
         return policy_loss, qf1_loss, qf2_loss, value_loss, entropy
 
     def learn(self, total_timesteps, callback=None, seed=None,
-              log_interval=2000, tb_log_name="MDPO", reset_num_timesteps=True, replay_wrapper=None):
+              log_interval=1000, tb_log_name="MDPO", reset_num_timesteps=True, replay_wrapper=None):
 
         new_tb_log = self._init_num_timesteps(reset_num_timesteps)
 
