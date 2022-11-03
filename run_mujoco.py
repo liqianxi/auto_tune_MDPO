@@ -22,7 +22,7 @@ def train(env_id, num_timesteps, seed, lam, sgd_steps, klcoeff, log, tsallis_coe
     with tf_util.single_threaded_session():
         rank = MPI.COMM_WORLD.Get_rank()
         seed = MPI.COMM_WORLD.Get_rank()
-        log_path = './experiments/'+str(env_id)+'./SAC-M/bootstrap-2/m'+str(sgd_steps)+'_c'+str(klcoeff)+'_e'+str(lam)+'_t'+str(tsallis_coeff)+'_'+str(seed)+"randomid"+str(random.random())
+        log_path = './experiments/'+str(env_id)+'./MDPO/bootstrap-2/m'+str(sgd_steps)+'_c'+str(klcoeff)+'_e'+str(lam)+'_t'+str(tsallis_coeff)+'_'+str(seed)+"randomid"+str(random.random())
         if not log:
             #if rank == 0:
             logger.configure(log_path)
