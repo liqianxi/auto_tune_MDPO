@@ -48,7 +48,7 @@ def train(env_id, num_timesteps, seed, sgd_steps, klcoeff, log, tsallis_coeff):
         env = VecNormalize(env, norm_reward=False, norm_obs=False)
         
         #env = VecNormalize(env)
-        model = MDPO_Auto(MlpPolicy, env, gamma=0.99, verbose=1, seed=seed, buffer_size=1000000, gradient_steps=sgd_steps, \
+        model = MDPO_Auto(MlpPolicy, env, gamma=0.99, verbose=1, seed=seed,tensorboard_log="./tensorboard_auto_log/", buffer_size=1000000, gradient_steps=sgd_steps, \
              train_freq=1, tsallis_q=tsallis_coeff, reparameterize=True, klconst=klcoeff, learning_starts=10000)
         model.learn(total_timesteps=int(num_timesteps))
         env.close()
