@@ -11,7 +11,7 @@ from stable_baselines.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv
 import gym
 import random
-def train(env_id, num_timesteps, seed, sgd_steps, klcoeff, log, tsallis_coeff):
+def train(env_id, num_timesteps, seed, sgd_steps, klcoeff, log, tsallis_coeff,ent_coef):
     """
     Train TRPO model for the mujoco environment, for testing purposes
     :param env_id: (str) Environment ID
@@ -49,7 +49,7 @@ def train(env_id, num_timesteps, seed, sgd_steps, klcoeff, log, tsallis_coeff):
         
         #env = VecNormalize(env)
         model = MDPO_Auto(MlpPolicy, env, gamma=0.99, verbose=1, seed=seed,tensorboard_log="./tensorboard_auto_log/", buffer_size=1000000, gradient_steps=sgd_steps, \
-             train_freq=1, tsallis_q=tsallis_coeff, reparameterize=True, klconst=klcoeff, learning_starts=10000)
+             train_freq=1, tsallis_q=tsallis_coeff, reparameterize=True, klconst=klcoeff, learning_starts=10000,ent_coef=ent_coef)
         model.learn(total_timesteps=int(num_timesteps))
         env.close()
 
@@ -60,7 +60,7 @@ def main():
     """
     args = mujoco_arg_parser().parse_args()
     print(args)
-    train(args.env, num_timesteps=args.num_timesteps, seed=args.run, sgd_steps=args.sgd_steps, klcoeff=args.klcoeff, log=args.log, tsallis_coeff=args.tsallis_coeff)
+    train(args.env, num_timesteps=args.num_timesteps, seed=args.run, sgd_steps=args.sgd_steps, klcoeff=args.klcoeff, log=args.log, tsallis_coeff=args.tsallis_coeff,ent_coef=args.lam)
 
 
 if __name__ == '__main__':

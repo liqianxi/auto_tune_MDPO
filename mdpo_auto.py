@@ -269,8 +269,9 @@ class MDPO_Auto(OffPolicyRLModel):
                     # Compute the policy loss
                     # Alternative: policy_kl_loss = tf.reduce_mean(logp_pi - min_qf_pi)
                     if self.reparameterize:
-                        
                         policy_kl_loss = tf.reduce_mean(logp_pi * self.kl_coef_ph + self.tsallis_q * (self.ent_coef - self.kl_coef_ph) * logp_pi_old - qf1_pi)
+    
+                        #policy_kl_loss = tf.reduce_mean(logp_pi * self.kl_coef_ph + self.tsallis_q * (self.ent_coef - self.kl_coef_ph) * logp_pi_old - qf1_pi)
                         
                     else:
             
