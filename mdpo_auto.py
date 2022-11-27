@@ -209,7 +209,7 @@ class MDPO_Auto(OffPolicyRLModel):
                     # of https://arxiv.org/abs/1812.05905
                     if isinstance(self.ent_coef, str) and self.ent_coef.startswith('auto'):
                         # Default initial value of ent_coef when learned
-                        init_value = 1.0
+                        init_value = 0.25
                         if '_' in self.ent_coef:
                             init_value = float(self.ent_coef.split('_')[1])
                             assert init_value > 0., "The initial value of ent_coef must be greater than 0"
@@ -260,7 +260,7 @@ class MDPO_Auto(OffPolicyRLModel):
 
                     if not isinstance(self.ent_coef, float):
                         ent_coef_loss = -tf.reduce_mean(
-                            self.log_ent_coef * tf.stop_gradient(logp_pi + self.target_entropy))
+                            self.log_ent_coef * tf.stop_gradient(logp_pi + self.target_entropy)) 
                  
                         
                         entropy_optimizer = tf.train.AdamOptimizer(learning_rate=3e-4)
@@ -449,7 +449,7 @@ class MDPO_Auto(OffPolicyRLModel):
         return policy_loss, qf1_loss, qf2_loss, value_loss, entropy
 
     def learn(self, total_timesteps, callback=None, seed=None,
-              log_interval=100, tb_log_name="MDPO_Auto", reset_num_timesteps=True, replay_wrapper=None):
+              log_interval=1000, tb_log_name="MDPO_Auto", reset_num_timesteps=True, replay_wrapper=None):
 
         new_tb_log = self._init_num_timesteps(reset_num_timesteps)
 

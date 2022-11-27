@@ -11,7 +11,10 @@ from stable_baselines.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv
 import gym
 import random
-def train(env_id, num_timesteps, seed, sgd_steps, klcoeff, log, tsallis_coeff,ent_coef):
+import datetime
+ct = datetime.datetime.now()
+
+def train(env_id, num_timesteps, seed, sgd_steps, klcoeff, log, tsallis_coeff):
     """
     Train TRPO model for the mujoco environment, for testing purposes
     :param env_id: (str) Environment ID
@@ -21,7 +24,7 @@ def train(env_id, num_timesteps, seed, sgd_steps, klcoeff, log, tsallis_coeff,en
     with tf_util.single_threaded_session():
         rank = MPI.COMM_WORLD.Get_rank()
         seed = MPI.COMM_WORLD.Get_rank()
-        log_path = './experiments/'+str(env_id)+'./MDPO_Auto/bootstrap-2/m'+str(sgd_steps)+'_c'+str(klcoeff)+'_t'+str(tsallis_coeff)+'_'+str(seed)+"randomid"+str(random.random())
+        log_path = './experiments/'+str(env_id)+'./MDPO_Auto/bootstrap-2/m'+str(sgd_steps)+'_c'+str(klcoeff)+'_t'+str(tsallis_coeff)+'_'+str(seed)+"randomid"+str(ct)
         if not log:
             #if rank == 0:
             logger.configure(log_path)
@@ -49,7 +52,7 @@ def train(env_id, num_timesteps, seed, sgd_steps, klcoeff, log, tsallis_coeff,en
         
         #env = VecNormalize(env)
         model = MDPO_Auto(MlpPolicy, env, gamma=0.99, verbose=1, seed=seed,tensorboard_log="./tensorboard_auto_log/", buffer_size=1000000, gradient_steps=sgd_steps, \
-             train_freq=1, tsallis_q=tsallis_coeff, reparameterize=True, klconst=klcoeff, learning_starts=10000,ent_coef=ent_coef)
+             train_freq=1, tsallis_q=tsallis_coeff, reparameterize=True, klconst=klcoeff, learning_starts=10000)
         model.learn(total_timesteps=int(num_timesteps))
         env.close()
 
@@ -60,7 +63,7 @@ def main():
     """
     args = mujoco_arg_parser().parse_args()
     print(args)
-    train(args.env, num_timesteps=args.num_timesteps, seed=args.run, sgd_steps=args.sgd_steps, klcoeff=args.klcoeff, log=args.log, tsallis_coeff=args.tsallis_coeff,ent_coef=args.lam)
+    train(args.env, num_timesteps=args.num_timesteps, seed=args.run, sgd_steps=args.sgd_steps, klcoeff=args.klcoeff, log=args.log, tsallis_coeff=args.tsallis_coeff)
 
 
 if __name__ == '__main__':
