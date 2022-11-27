@@ -11,8 +11,7 @@ The python version is 3.7
 pip install stable-baselines[mpi]==2.7.0
 ~~~
 
-2. 
-[Download](https://www.roboti.us/index.html) and copy MuJoCo library and license files into a `.mujoco/` directory. We use `mujoco200` for this project.
+2. [Download](https://www.roboti.us/index.html) and copy MuJoCo library and license files into a `.mujoco/` directory. We use `mujoco200` for this project.
 
 3. Clone MDPO and copy the `mdpo-on` and `mdpo-off` directories inside [this directory](https://github.com/hill-a/stable-baselines/tree/master/stable_baselines).
 
