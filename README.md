@@ -83,12 +83,6 @@ The key innovation in MDPO-Auto is the automated entropy coefficient adjustment.
 
 The entropy coefficient (λ) converges to approximately 0.23 during training, slightly higher than the manually tuned value of 0.2 used in the original MDPO paper.
 
-## Citations
-If you use this code in your research, please cite our work:
-```
-[Citation information to be added]
-```
-
 ## Acknowledgments
 This project builds upon the work of:
 - Mirror Descent Policy Optimization (MDPO) by Tomar et al.
