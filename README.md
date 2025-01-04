@@ -1,61 +1,98 @@
 # MDPO-Auto: Enabling Hyperparameter Auto-tuning in Off-policy Mirror Descent Policy Optimization
 
 ## Introduction
-Mirror Descent Policy Optimization (MDPO), is a deep reinforcement learning (RL) algorithm that
-uses the idea of Mirror Descent (MD) to enforce a trust-region constraint in a soft way when optimizing
-for the policy. Researchers examine the performance of MDPO and notice it outperforms several popular
-deep RL algorithms, such as TRPO, PPO and SAC. In the second paper of SAC, the authors extend the
-vanilla SAC algorithm, they design and implement an approach to allow one critical hyperparameter -
-entropy coefficient to be tuned automatically during the deep RL training. The entropy coefficient set the
-relative importance of the entropy term when optimizing the policy and it is usually selected manually and
-empirically by the researchers, which is extremely time-consuming.  
+MDPO-Auto extends Mirror Descent Policy Optimization (MDPO) by introducing automatic tuning of the entropy coefficient (λ). MDPO is a deep reinforcement learning algorithm that uses Mirror Descent to enforce trust-region constraints when optimizing policies. While MDPO has shown superior performance compared to algorithms like TRPO, PPO, and SAC, it requires manual tuning of the entropy coefficient, which is time-consuming and potentially suboptimal.
 
-In this work, we will combine the work of the off-policy MDPO algorithm and the entropy coefficient
-auto-tuning approach to obtain a new variant of the off-policy MDPO algorithm, which we name it
-MDPO-Auto. We derive the update rule for the entropy coefficient and modify the off-policy MDPO
-algorithm to be the MDPO-Auto algorithm. Besides, we conduct experiments on an OpenAI Gym
-simulated environment and MDPO-Auto outperforms off-policy MDPO.
+This project combines MDPO with an entropy coefficient auto-tuning approach inspired by SAC (Soft Actor-Critic), creating a more efficient and automated variant of the algorithm.
 
-## Experiment Results
-![alt text](https://github.com/liqianxi/auto_tune_MDPO/blob/a3613522e50e3de4886e3e68afc087ac8b04928f/compare.png)
-![alt text](https://github.com/liqianxi/auto_tune_MDPO/blob/a3613522e50e3de4886e3e68afc087ac8b04928f/ent_coeff.png)
+## Key Features
+- Automatic tuning of the entropy coefficient (λ)
+- Integration with off-policy MDPO
+- Built on stable-baselines framework
+- Support for MuJoCo environments
 
+## Performance Note
+Current implementation achieves performance approximately equal to or slightly better than MDPO with manually tuned λ=0.2, with our auto-tuned λ converging to around 0.23. Both MDPO-Auto and MDPO outperform the baseline SAC method.
 
 ## Prerequisites
-All dependencies are provided in a python virtual-env requirements.txt file. Majorly, you would need to install stable-baselines, tensorflow, and mujoco_py.
-The python version is 3.7
+- Python 3.7
+- MuJoCo 2.0
+- stable-baselines==2.7.0
+- tensorflow
+- mujoco_py
 
 ## Installation
 
-1. Install stable-baselines
-~~~
+1. Install stable-baselines:
+```bash
 pip install stable-baselines[mpi]==2.7.0
-~~~
+```
 
-2. [Download](https://www.roboti.us/index.html) and copy MuJoCo library and license files into a `.mujoco/` directory. We use `mujoco200` for this project.
+2. Install MuJoCo:
+   - [Download MuJoCo 2.0](https://www.roboti.us/index.html)
+   - Copy MuJoCo files to `.mujoco/` directory
+   - Set up license file
 
-3. Clone MDPO and copy the `mdpo-on` and `mdpo-off` directories inside [this directory](https://github.com/hill-a/stable-baselines/tree/master/stable_baselines).
+3. Set up MDPO:
+   - Clone the MDPO repository
+   - Copy `mdpo-on` and `mdpo-off` directories to your stable-baselines installation
 
-
-4. Activate `virtual-env` using the `requirements.txt` file provided.
-~~~
+4. Install dependencies:
+```bash
 source <virtual env path>/bin/activate
-~~~
+pip install -r requirements.txt
+```
 
-# Example
+## Usage Examples
 
-Off-policy MDPO
-~~~
+### Run MDPO-Auto
+```bash
+python3.7 mdpo_off/run_mujoco_auto.py --env=Walker2d-v2 --num_timesteps=1e6 --sgd_steps=1 --klcoeff=0.4 --tsallis_coeff=2.0
+```
+
+### Run Original Off-policy MDPO
+```bash
 python3 run_mujoco.py --env=Walker2d-v2 --num_timesteps=1e6 --sgd_steps=1000 --klcoeff=1.0 --lam=0.2 --tsallis_coeff=1.0
-~~~
+```
 
-SAC
-~~~
-python3 sac/run_mujoco.py --env=Walker2d-v2 --num_timesteps=1e6 --sgd_steps=1;
-~~~
+### Run SAC
+```bash
+python3 sac/run_mujoco.py --env=Walker2d-v2 --num_timesteps=1e6 --sgd_steps=1
+```
 
-MDPO-Auto
-~~~
-python3.7 mdpo_off/run_mujoco_auto.py --env=Walker2d-v2 --num_timesteps=1e6 --sgd_steps=1 --klcoeff=0.4 --tsallis_coeff=2.0; 
+## Hyperparameters
+```python
+{
+    'learning_rate': 3e-4,
+    'batch_size': 256,
+    'buffer_size': 1000000,
+    'target_smoothing_coefficient': 0.005,
+    'hidden_layers': 2,
+    'hidden_units_per_layer': 256,
+    'discount_factor': 0.99,
+    'bregman_step_size': 0.4
+}
+```
 
-~~~
+## Algorithm Details
+
+The key innovation in MDPO-Auto is the automated entropy coefficient adjustment. The algorithm:
+1. Formulates the problem as a constrained optimization problem
+2. Converts it to a dual optimization problem
+3. Uses SGD to approximate the optimal λ value during training
+
+The entropy coefficient (λ) converges to approximately 0.23 during training, slightly higher than the manually tuned value of 0.2 used in the original MDPO paper.
+
+## Citations
+If you use this code in your research, please cite our work:
+```
+[Citation information to be added]
+```
+
+## Acknowledgments
+This project builds upon the work of:
+- Mirror Descent Policy Optimization (MDPO) by Tomar et al.
+- Soft Actor-Critic (SAC) by Haarnoja et al.
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
